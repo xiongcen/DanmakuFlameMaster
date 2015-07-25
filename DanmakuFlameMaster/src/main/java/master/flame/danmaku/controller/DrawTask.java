@@ -77,7 +77,7 @@ public class DrawTask implements IDrawTask {
     public DrawTask(DanmakuTimer timer, Context context, AbsDisplayer<?> disp,
             TaskListener taskListener) {
         mTaskListener = taskListener;
-        mContext = context;
+        mContext = context.getApplicationContext();
         mRenderer = new DanmakuRenderer();
         mDisp = disp;
         initTimer(timer);
