@@ -39,6 +39,7 @@ import master.flame.danmaku.danmaku.parser.DanmakuFactory;
 import master.flame.danmaku.danmaku.renderer.IRenderer.RenderingState;
 import master.flame.danmaku.danmaku.util.AndroidUtils;
 
+import java.lang.ref.WeakReference;
 import java.util.LinkedList;
 
 public class DrawHandler extends Handler {
@@ -93,7 +94,7 @@ public class DrawHandler extends Handler {
 
     public IDrawTask drawTask;
 
-    private IDanmakuViewController mDanmakuView;
+    private WeakReference<IDanmakuViewController> mDanmakuView;
 
     private boolean mDanmakusVisible = true;
 
@@ -148,7 +149,15 @@ public class DrawHandler extends Handler {
     }
 
     private void bindView(IDanmakuViewController view) {
-        this.mDanmakuView = view;
+        this.mDanmakuView = new WeakReference<IDanmakuViewController>(view);
+    }
+
+    private IDanmakuViewController getDanmakuView() {
+        if (mDanmakuView != null) {
+            IDanmakuViewController controller = mDanmakuView.get();
+            return controller;
+        }
+        return null;
     }
 
     public void setParser(BaseDanmakuParser parser) {
@@ -172,7 +181,7 @@ public class DrawHandler extends Handler {
         int what = msg.what;
         switch (what) {
             case PREPARE:
-                if (mParser == null || !mDanmakuView.isViewReady()) {
+                if (mParser == null || (getDanmakuView() != null && !getDanmakuView().isViewReady())) {
                     sendEmptyMessageDelayed(PREPARE, 100);
                 } else {
                     prepare(new Runnable() {
@@ -250,15 +259,15 @@ public class DrawHandler extends Handler {
                     }
                 }
                 mDanmakusVisible = true;
-                if(quitFlag && mDanmakuView != null) {
-                    mDanmakuView.drawDanmakus(); 
+                if(quitFlag && getDanmakuView() != null) {
+                    getDanmakuView().drawDanmakus();
                 }
                 notifyRendering();
                 break;
             case HIDE_DANMAKUS:
                 mDanmakusVisible = false;
-                if (mDanmakuView != null) {
-                    mDanmakuView.clear();
+                if (getDanmakuView() != null) {
+                    getDanmakuView().clear();
                 }
                 if(this.drawTask != null) {
                     this.drawTask.requestClear();
@@ -300,9 +309,9 @@ public class DrawHandler extends Handler {
                 notifyRendering();
                 break;
             case UPDATE_WHEN_PAUSED:
-                if (quitFlag && mDanmakuView != null) {
+                if (quitFlag && getDanmakuView() != null) {
                     drawTask.requestClear();
-                    mDanmakuView.drawDanmakus();
+                    getDanmakuView().drawDanmakus();
                     notifyRendering();
                 }
                 break;
@@ -340,7 +349,9 @@ public class DrawHandler extends Handler {
             sendEmptyMessageDelayed(UPDATE, 60 - d);
             return;
         }
-        d = mDanmakuView.drawDanmakus();
+        if (getDanmakuView() != null) {
+            d = getDanmakuView().drawDanmakus();
+        }
         removeMessages(UPDATE);
         if (!mDanmakusVisible) {
             waitRendering(INDEFINITE_TIME);
@@ -383,7 +394,9 @@ public class DrawHandler extends Handler {
                         SystemClock.sleep(60 - d);
                         continue;
                     }
-                    d = mDanmakuView.drawDanmakus();
+                    if (getDanmakuView() != null) {
+                        d = getDanmakuView().drawDanmakus();
+                    }
                     if (!mDanmakusVisible) {
                         waitRendering(INDEFINITE_TIME);
                     } else if (mRenderingState.nothingRendered && mIdleSleep) {
@@ -455,10 +468,12 @@ public class DrawHandler extends Handler {
     }
 
     private void prepare(final Runnable runnable) {
+        if (getDanmakuView() == null)
+            return;
         if (drawTask == null) {
-            drawTask = createDrawTask(mDanmakuView.isDanmakuDrawingCacheEnabled(), timer,
-                    mDanmakuView.getContext(), mDanmakuView.getWidth(), mDanmakuView.getHeight(),
-                    mDanmakuView.isHardwareAccelerated(), new IDrawTask.TaskListener() {
+            drawTask = createDrawTask(getDanmakuView().isDanmakuDrawingCacheEnabled(), timer,
+                    getDanmakuView().getContext(), getDanmakuView().getWidth(), getDanmakuView().getHeight(),
+                    getDanmakuView().isHardwareAccelerated(), new IDrawTask.TaskListener() {
                         @Override
                         public void ready() {
                             initRenderingConfigs();
